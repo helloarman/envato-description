@@ -1,0 +1,1861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeCanyon HTML Generator</title>
+    
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Load React and ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    
+    <!-- Load Babel for JSX support -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* Custom cursor for loading state */
+        .cursor-wait { cursor: wait; }
+        /* Dragging styles */
+        .dragging { opacity: 0.5; }
+        .drag-over { border-top: 2px solid #f97316; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        // --- ICON COMPONENTS (Inline SVGs) ---
+        const IconBase = ({ size = 24, className = "", children }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={`shrink-0 ${className}`} 
+            >
+                {children}
+            </svg>
+        );
+
+        const Plus = (props) => <IconBase {...props}><path d="M5 12h14"/><path d="M12 5v14"/></IconBase>;
+        const Minus = (props) => <IconBase {...props}><path d="M5 12h14"/></IconBase>;
+        const Trash2 = (props) => <IconBase {...props}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></IconBase>;
+        const MoveUp = (props) => <IconBase {...props}><path d="m18 15-6-6-6 6"/></IconBase>;
+        const MoveDown = (props) => <IconBase {...props}><path d="m6 9 6 6 6-6"/></IconBase>;
+        const CodeIcon = (props) => <IconBase {...props}><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></IconBase>;
+        const Eye = (props) => <IconBase {...props}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></IconBase>;
+        const EyeOff = (props) => <IconBase {...props}><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></IconBase>;
+        const TypeIcon = (props) => <IconBase {...props}><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></IconBase>;
+        const HeadingIcon = (props) => <IconBase {...props}><path d="M6 12h12"/><path d="M6 20V4"/><path d="M18 20V4"/></IconBase>;
+        const FileText = (props) => <IconBase {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></IconBase>;
+        const ImageIcon = (props) => <IconBase {...props}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></IconBase>;
+        const Images = (props) => <IconBase {...props}><path d="M18 22H4a2 2 0 0 1-2-2V6"/><path d="m22 15-5-5L5 21"/><path d="M22 6v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2ZM8 10a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z"/></IconBase>;
+        const TableIcon = (props) => <IconBase {...props}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" x2="21" y1="9" y2="9"/><line x1="3" x2="21" y1="15" y2="15"/><line x1="12" x2="12" y1="3" y2="21"/></IconBase>;
+        const History = (props) => <IconBase {...props}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/><path d="M3 3v9h9"/><path d="M12 7v5l3 3"/></IconBase>;
+        const Copy = (props) => <IconBase {...props}><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></IconBase>;
+        const Check = (props) => <IconBase {...props}><polyline points="20 6 9 17 4 12"/></IconBase>;
+        const AlertCircle = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></IconBase>;
+        const RefreshCw = (props) => <IconBase {...props}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 12"/><path d="M21 3v9h-9"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 12"/><path d="M3 21v-9h9"/></IconBase>;
+        const Lock = (props) => <IconBase {...props}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></IconBase>;
+        const Save = (props) => <IconBase {...props}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></IconBase>;
+        const Cloud = (props) => <IconBase {...props}><path d="M17.5 19c0-3.037-2.463-5.5-5.5-5.5S6.5 15.963 6.5 19"/><path d="M20 16.5c1.9 0 3.5 1.5 3.5 3.5s-1.5 3.5-3.5 3.5H4c-2.2 0-4-1.8-4-4 0-1.9 1.3-3.5 3.1-3.9"/><path d="M12 13V3"/><path d="m16 7-4-4-4 4"/></IconBase>;
+        const CloudCheck = (props) => <IconBase {...props}><path d="M12 21a9 9 0 0 0 9-9 9 9 0 0 0-9-9 9 9 0 0 0-9 9 9 9 0 0 0 9 9Z"/><path d="m9 12 2 2 4-4"/></IconBase>;
+        const RotateCcw = (props) => <IconBase {...props}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/><path d="M3 3v9h9"/></IconBase>;
+        const Edit2 = (props) => <IconBase {...props}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></IconBase>;
+        const Loader2 = (props) => <IconBase {...props}><path d="M21 12a9 9 0 1 1-6.219-8.56"/><line x1="12" x2="12" y1="2" y2="4"/><line x1="12" x2="12" y1="20" y2="22"/><line x1="4.93" x2="6.34" y1="4.93" y2="6.34"/><line x1="17.66" x2="19.07" y1="17.66" y2="19.07"/><line x1="2" x2="4" y1="12" y2="12"/><line x1="20" x2="22" y1="12" y2="12"/><line x1="4.93" x2="6.34" y1="19.07" y2="17.66"/><line x1="17.66" x2="19.07" y1="6.34" y2="4.93"/></IconBase>;
+        const Eraser = (props) => <IconBase {...props}><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></IconBase>;
+        const Play = (props) => <IconBase {...props}><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></IconBase>;
+        const ArrowDown = (props) => <IconBase {...props}><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></IconBase>;
+        const GripVertical = (props) => <IconBase {...props}><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></IconBase>;
+        const List = (props) => <IconBase {...props}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></IconBase>;
+        const Folder = (props) => <IconBase {...props}><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></IconBase>;
+        const ChevronDown = (props) => <IconBase {...props}><polyline points="6 9 12 15 18 9"/></IconBase>;
+        const ChevronUp = (props) => <IconBase {...props}><polyline points="18 15 12 9 6 15"/></IconBase>;
+        
+        const Bold = (props) => <IconBase {...props}><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></IconBase>;
+        const LinkIcon = (props) => <IconBase {...props}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></IconBase>;
+        const CornerDownLeft = (props) => <IconBase {...props}><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></IconBase>;
+
+
+        // --- CONSTANTS ---
+        const PREVIEW_CSS = `
+          .cc-preview { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #545454; line-height: 1.5; font-size: 14px; }
+          .cc-preview h1 { font-size: 20px; margin-bottom: 15px; font-weight: 600; color: #333; line-height: 1.1; }
+          .cc-preview h2 { font-size: 18px; margin-bottom: 15px; font-weight: 600; color: #333; line-height: 1.1; }
+          .cc-preview h3 { font-size: 16px; margin-bottom: 15px; font-weight: 600; color: #333; line-height: 1.1; }
+          .cc-preview h4 { font-size: 14px; margin-bottom: 15px; font-weight: 600; color: #333; line-height: 1.1; }
+          .cc-preview p { margin-bottom: 15px; }
+          .cc-preview a { color: #0073aa; text-decoration: underline; cursor: pointer; } 
+          .cc-preview ul { list-style-type: disc; margin-left: 20px; margin-bottom: 15px; }
+          .cc-preview ol { list-style-type: decimal; margin-left: 20px; margin-bottom: 15px; }
+          .cc-preview li { margin-bottom: 5px; }
+          .cc-preview table { width: 100%; border-collapse: collapse; margin-bottom: 20px; border-spacing: 0; }
+          .cc-preview th, .cc-preview td { border: 1px solid #e5e5e5; padding: 10px; text-align: left; vertical-align: top; }
+          .cc-preview th { background-color: #fcfcfc; font-weight: 600; color: #333; }
+          .cc-preview img { max-width: 100%; height: auto; display: block; margin: 0 auto 15px; }
+          .cc-preview table[cellpadding="0"] td { border: none; padding: 0; }
+          .cc-preview hr { border: 0; border-top: 1px solid #eee; margin: 20px 0; }
+          .cc-preview pre { 
+            background: #fcfcfc; 
+            padding: 20px; 
+            border: 1px solid #e5e5e5; 
+            border-radius: 4px; 
+            overflow-x: auto; 
+            white-space: pre-wrap; 
+            font-family: Consolas, "Andale Mono", "Lucida Console", "Courier New", monospace; 
+            font-size: 13px; 
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            display: block;
+          }
+        `;
+
+
+        // --- HELPER FUNCTIONS ---
+        
+        const getBlockLabel = (type) => {
+            switch (type) {
+                case BlockTypes.IMAGE_ROW: return 'Multi-Image Row';
+                case BlockTypes.CREDENTIALS: return 'Credentials';
+                case BlockTypes.BREAK_LINE: return 'Break Line';
+                case BlockTypes.SUBHEADING: return 'Sub Heading';
+                case BlockTypes.GROUP: return 'Group Container';
+                case BlockTypes.TITLE: return 'Title Block';
+                case BlockTypes.DETAILS: return 'Details Block';
+                case BlockTypes.IMAGE: return 'Image Block';
+                case BlockTypes.TABLE: return 'Data Table';
+                case BlockTypes.LOG: return 'Change Log';
+                case BlockTypes.LIST: return 'List Block';
+                default: return `${type} Block`;
+            }
+        };
+
+        const escapeHtml = (text) => {
+          if (!text) return '';
+          return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+        };
+
+        const formatHTML = (html) => {
+          let formatted = '';
+          const reg = /(>)(<)(\/*)/g;
+          
+          const preBlocks = [];
+          let protectedHtml = html.replace(/<pre>([\s\S]*?)<\/pre>/g, (match) => {
+            preBlocks.push(match);
+            return `___PRE_BLOCK_${preBlocks.length - 1}___`;
+          });
+
+          const xml = protectedHtml.replace(reg, '$1\r\n$2$3');
+          let pad = 0;
+
+          xml.split('\r\n').forEach((node) => {
+            let indent = 0;
+            if (node.match(/.+<\/\w[^>]*>$/)) {
+              indent = 0;
+            } else if (node.match(/^<\/\w/)) {
+              if (pad !== 0) pad -= 1;
+            } else if (node.match(/^<\w[^>]*[^\/]>.*$/)) {
+              indent = 1;
+            } else {
+              indent = 0;
+            }
+
+            let padding = '';
+            for (let i = 0; i < pad; i++) {
+              padding += '  ';
+            }
+
+            formatted += padding + node + '\r\n';
+            pad += indent;
+          });
+
+          return formatted.replace(/___PRE_BLOCK_(\d+)___/g, (match, index) => {
+            return preBlocks[index];
+          }).trim();
+        };
+
+        const BlockTypes = {
+          TITLE: 'title',
+          SUBHEADING: 'subheading', 
+          DETAILS: 'details',
+          IMAGE: 'image',
+          IMAGE_ROW: 'image_row',
+          TABLE: 'table',
+          LOG: 'log',
+          CREDENTIALS: 'credentials',
+          BREAK_LINE: 'break_line',
+          GROUP: 'group',
+          LIST: 'list', // New Block Type
+        };
+
+        const generateSingleBlockHTML = (block) => {
+             // Helper function to generate HTML for a single block
+             let html = '';
+             switch (block.type) {
+                case BlockTypes.TITLE:
+                  html += `<${block.data.tag || 'h2'}>${block.data.text || ''}</${block.data.tag || 'h2'}>\n`;
+                  break;
+                case BlockTypes.SUBHEADING:
+                  html += `<${block.data.tag || 'h3'}>${block.data.text || ''}</${block.data.tag || 'h3'}>\n`;
+                  break;
+                case BlockTypes.DETAILS:
+                  html += `${block.data.content || ''}\n`;
+                  break;
+                case BlockTypes.IMAGE:
+                  if (block.data.url) {
+                    html += `<img src="${block.data.url}" alt="${block.data.alt || ''}" width="100%" />\n`;
+                  }
+                  break;
+                case BlockTypes.IMAGE_ROW:
+                  if (block.data.images && block.data.images.length > 0) {
+                    const width = Math.floor(100 / block.data.images.length);
+                    html += `<table width="100%" border="0" cellspacing="0" cellpadding="0">\n`;
+                    html += `  <tr>\n`;
+                    block.data.images.forEach(img => {
+                      html += `    <td width="${width}%" valign="top" align="center">\n`;
+                      if (img.url) {
+                        html += `      <img src="${img.url}" alt="${img.alt || ''}" width="100%" />\n`;
+                      }
+                      html += `    </td>\n`;
+                    });
+                    html += `  </tr>\n`;
+                    html += `</table>\n`;
+                  }
+                  break;
+                case BlockTypes.TABLE:
+                  if (block.data.rows && block.data.rows.length > 0) {
+                    html += `<table>\n`;
+                    block.data.rows.forEach((row, idx) => {
+                      html += `  <tr>\n`;
+                      row.forEach(cell => {
+                        const tag = idx === 0 ? 'th' : 'td';
+                        html += `    <${tag}>${cell}</${tag}>\n`;
+                      });
+                      html += `  </tr>\n`;
+                    });
+                    html += `</table>\n`;
+                  }
+                  break;
+                case BlockTypes.LOG:
+                  if (block.data.logs && block.data.logs.length > 0) {
+                    html += `<h3># Changelog</h3>\n`;
+                    html += `<pre>\n`; 
+                    block.data.logs.forEach((log, index) => {
+                       if (index > 0) {
+                         html += `\n\n---\n\n`;
+                       }
+                       const ver = escapeHtml(log.version || '');
+                       const date = escapeHtml(log.date || '');
+                       html += `## ${ver}${date ? ' – ' + date : ''}\n\n`;
+                       html += escapeHtml(log.changes || '');
+                    });
+                    html += `</pre>\n`;
+                  }
+                  break;
+                case BlockTypes.CREDENTIALS:
+                  if (block.data.title) html += `<h3>${block.data.title}</h3>\n`;
+                  if (block.data.description) html += `<p>${block.data.description}</p>\n`;
+                  if (block.data.loginUrl) html += `<p><strong>Login Here:</strong> <a href="${block.data.loginUrl}">${block.data.loginUrl}</a></p>\n`;
+                  if (block.data.credentials && block.data.credentials.length > 0) {
+                      html += `<table>\n`;
+                      html += `  <tr><th>Role / User</th><th>Email / Username</th><th>Password</th></tr>\n`;
+                      block.data.credentials.forEach(cred => {
+                          html += `  <tr>\n    <td>${cred.role || ''}</td>\n    <td>${cred.email || ''}</td>\n    <td>${cred.password || ''}</td>\n  </tr>\n`;
+                      });
+                      html += `</table>\n`;
+                  }
+                  break;
+                case BlockTypes.BREAK_LINE:
+                  html += `<hr />\n`;
+                  break;
+                case BlockTypes.GROUP:
+                  if (block.data.blocks && block.data.blocks.length > 0) {
+                      block.data.blocks.forEach(childBlock => {
+                         html += generateSingleBlockHTML(childBlock);
+                      });
+                  }
+                  break;
+                case BlockTypes.LIST:
+                    if (block.data.title) html += `<h3>${block.data.title}</h3>\n`;
+                    const listTag = block.data.listType || 'ul';
+                    if (block.data.items && block.data.items.length > 0) {
+                        html += `<${listTag}>\n`;
+                        block.data.items.forEach(item => {
+                            html += `  <li>${item}</li>\n`;
+                        });
+                        html += `</${listTag}>\n`;
+                    }
+                    break;
+                default:
+                  break;
+              }
+              return html;
+        }
+
+        const parseHtmlToBlocks = (html) => {
+          const container = document.createElement('div');
+          container.innerHTML = html;
+          const nodes = Array.from(container.childNodes);
+          const newBlocks = [];
+          let currentDetails = '';
+
+          const flushDetails = () => {
+            if (currentDetails.trim()) {
+              newBlocks.push({
+                id: Date.now().toString() + Math.random(),
+                type: BlockTypes.DETAILS,
+                data: { content: currentDetails.trim() }
+              });
+            }
+            currentDetails = '';
+          };
+
+          for (let i = 0; i < nodes.length; i++) {
+            const node = nodes[i];
+
+            if (node.nodeType === Node.TEXT_NODE || (node.nodeType === Node.ELEMENT_NODE && !['H1','H2','H3','H4','H5','H6','IMG','TABLE','PRE','HR','UL','OL'].includes(node.tagName))) {
+               currentDetails += node.nodeType === Node.TEXT_NODE ? node.textContent : node.outerHTML;
+               continue;
+            }
+
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const tag = node.tagName;
+
+              if (tag === 'H1') {
+                flushDetails();
+                newBlocks.push({
+                  id: Date.now().toString() + Math.random(),
+                  type: BlockTypes.TITLE,
+                  data: { tag: 'h1', text: node.textContent }
+                });
+              }
+              else if (tag === 'H2') {
+                flushDetails();
+                newBlocks.push({
+                  id: Date.now().toString() + Math.random(),
+                  type: BlockTypes.TITLE,
+                  data: { tag: 'h2', text: node.textContent }
+                });
+              }
+              else if (['H3', 'H4', 'H5', 'H6'].includes(tag)) {
+                if (tag === 'H3' && node.textContent.trim() === '# Changelog') {
+                     const next = nodes[i+1];
+                     if (next && next.tagName === 'PRE') {
+                         flushDetails();
+                         continue; 
+                     }
+                }
+
+                flushDetails();
+                newBlocks.push({
+                  id: Date.now().toString() + Math.random(),
+                  type: BlockTypes.SUBHEADING,
+                  data: { tag: tag.toLowerCase(), text: node.textContent }
+                });
+              }
+              else if (tag === 'IMG') {
+                flushDetails();
+                newBlocks.push({
+                  id: Date.now().toString() + Math.random(),
+                  type: BlockTypes.IMAGE,
+                  data: { url: node.getAttribute('src'), alt: node.getAttribute('alt') }
+                });
+              }
+              else if (tag === 'HR') {
+                flushDetails();
+                newBlocks.push({
+                  id: Date.now().toString() + Math.random(),
+                  type: BlockTypes.BREAK_LINE,
+                  data: {}
+                });
+              }
+              else if (tag === 'UL' || tag === 'OL') {
+                  flushDetails();
+                  const listItems = [];
+                  node.querySelectorAll('li').forEach(li => listItems.push(li.innerHTML));
+                  newBlocks.push({
+                      id: Date.now().toString() + Math.random(),
+                      type: BlockTypes.LIST,
+                      data: {
+                          listType: tag.toLowerCase(),
+                          items: listItems,
+                          title: '' // Title parsing is tricky without context, leaving empty
+                      }
+                  });
+              }
+              else if (tag === 'TABLE') {
+                flushDetails();
+                const images = node.querySelectorAll('img');
+                const rows = node.querySelectorAll('tr');
+                
+                if (images.length > 0 && rows.length === 1) {
+                   const imgData = Array.from(images).map(img => ({
+                     url: img.getAttribute('src'),
+                     alt: img.getAttribute('alt') || ''
+                   }));
+                   newBlocks.push({
+                    id: Date.now().toString() + Math.random(),
+                    type: BlockTypes.IMAGE_ROW,
+                    data: { images: imgData }
+                   });
+                } else {
+                   const tableRows = [];
+                   const trs = node.querySelectorAll('tr');
+                   trs.forEach(tr => {
+                     const rowData = [];
+                     const cells = tr.querySelectorAll('td, th');
+                     cells.forEach(cell => {
+                        rowData.push(cell.textContent);
+                     });
+                     if (rowData.length > 0) tableRows.push(rowData);
+                   });
+                   
+                   newBlocks.push({
+                     id: Date.now().toString() + Math.random(),
+                     type: BlockTypes.TABLE,
+                     data: { rows: tableRows.length ? tableRows : [['Header', 'Value']] }
+                   });
+                }
+              }
+              else if (tag === 'PRE') {
+                flushDetails();
+                const text = node.textContent;
+                const logs = [];
+                const versionBlocks = text.split(/(?=## )/g);
+                
+                versionBlocks.forEach(vBlock => {
+                    const lines = vBlock.trim().split('\n');
+                    if (lines.length === 0 || !lines[0].startsWith('##')) return;
+                    
+                    const headerLine = lines[0].replace(/^##\s*/, '');
+                    const separatorIndex = headerLine.indexOf('–'); 
+                    
+                    let version = '';
+                    let date = '';
+                    
+                    if (separatorIndex !== -1) {
+                        version = headerLine.substring(0, separatorIndex).trim();
+                        date = headerLine.substring(separatorIndex + 1).trim();
+                    } else {
+                        version = headerLine;
+                    }
+
+                    const changes = lines.slice(1).join('\n').trim();
+                    
+                    if (version) {
+                        logs.push({ version, date, changes });
+                    }
+                });
+
+                if (logs.length > 0) {
+                    newBlocks.push({
+                        id: Date.now().toString() + Math.random(),
+                        type: BlockTypes.LOG,
+                        data: { logs }
+                    });
+                } else {
+                    currentDetails += node.outerHTML;
+                }
+              }
+              else {
+                 currentDetails += node.outerHTML;
+              }
+            }
+          }
+          flushDetails();
+          return newBlocks;
+        };
+
+
+        // --- SUB-COMPONENTS FOR EDITORS ---
+
+        const TitleEditor = ({ data, onChange }) => (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Heading Text</label>
+              <input
+                type="text"
+                value={data.text || ''}
+                onChange={(e) => onChange({ ...data, text: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                placeholder="e.g., Main Features"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Size</label>
+              <select
+                value={data.tag || 'h2'}
+                onChange={(e) => onChange({ ...data, tag: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="h1">Heading 1 (Page Title)</option>
+                <option value="h2">Heading 2 (Section Title)</option>
+              </select>
+            </div>
+          </div>
+        );
+
+        const SubHeadingEditor = ({ data, onChange }) => (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Sub-heading Text</label>
+              <input
+                type="text"
+                value={data.text || ''}
+                onChange={(e) => onChange({ ...data, text: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                placeholder="e.g., Key Features"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Size</label>
+              <select
+                value={data.tag || 'h3'}
+                onChange={(e) => onChange({ ...data, tag: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="h3">Heading 3 (Default Sub)</option>
+                <option value="h4">Heading 4</option>
+                <option value="h5">Heading 5</option>
+                <option value="h6">Heading 6</option>
+              </select>
+            </div>
+          </div>
+        );
+
+        const ListEditor = ({ data, onChange }) => {
+            const items = data.items || ['Feature 1', 'Feature 2'];
+            const title = data.title || '';
+            const listType = data.listType || 'ul';
+            const [focusedIndex, setFocusedIndex] = useState(null);
+
+            const updateItem = (index, value) => {
+                const newItems = [...items];
+                newItems[index] = value;
+                onChange({ ...data, items: newItems });
+            };
+
+            const addItem = () => {
+                onChange({ ...data, items: [...items, ''] });
+            };
+
+            const removeItem = (index) => {
+                if (items.length <= 1) return;
+                const newItems = items.filter((_, i) => i !== index);
+                onChange({ ...data, items: newItems });
+            };
+            
+            const insertTag = (tag) => {
+                if (focusedIndex === null || focusedIndex >= items.length) return;
+                const currentValue = items[focusedIndex];
+                // Simple append for now, proper cursor insertion would require refs and selection tracking
+                updateItem(focusedIndex, currentValue + tag);
+            };
+
+            return (
+                <div className="space-y-4">
+                    <div className="flex gap-4">
+                         <div className="flex-1">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">List Title (Optional)</label>
+                            <input
+                                type="text"
+                                value={title}
+                                onChange={(e) => onChange({ ...data, title: e.target.value })}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                placeholder="e.g. Key Features"
+                            />
+                         </div>
+                         <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
+                            <div className="flex bg-slate-100 p-1 rounded-md border border-slate-200">
+                                <button 
+                                    onClick={() => onChange({ ...data, listType: 'ul' })}
+                                    className={`px-3 py-1 text-xs font-medium rounded ${listType === 'ul' ? 'bg-white shadow text-orange-600' : 'text-slate-500 hover:bg-slate-200'}`}
+                                >
+                                    Bullets
+                                </button>
+                                <button 
+                                    onClick={() => onChange({ ...data, listType: 'ol' })}
+                                    className={`px-3 py-1 text-xs font-medium rounded ${listType === 'ol' ? 'bg-white shadow text-orange-600' : 'text-slate-500 hover:bg-slate-200'}`}
+                                >
+                                    Numbers
+                                </button>
+                            </div>
+                         </div>
+                    </div>
+                    
+                    <div className="border-t border-slate-100 pt-3">
+                         <div className="flex justify-between items-center mb-2">
+                             <div className="flex gap-2">
+                                <button onClick={() => insertTag('<strong>Bold</strong>')} className="flex items-center gap-1 text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300" title="Append Bold to focused item"><Bold size={12}/> Bold</button>
+                                <button onClick={() => insertTag('<a href="#">Link</a>')} className="flex items-center gap-1 text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300" title="Append Link to focused item"><LinkIcon size={12}/> Link</button>
+                             </div>
+                             <button 
+                                onClick={addItem}
+                                className="text-xs flex items-center gap-1 bg-orange-100 text-orange-700 px-3 py-1.5 rounded hover:bg-orange-200 font-medium"
+                             >
+                                <Plus size={14} /> Add Item
+                             </button>
+                         </div>
+                         
+                         <div className="space-y-2">
+                            {items.map((item, index) => (
+                                <div key={index} className="flex gap-2 items-center">
+                                    <div className="text-slate-400 text-xs font-mono w-4 text-right">
+                                        {listType === 'ol' ? `${index + 1}.` : '•'}
+                                    </div>
+                                    <input
+                                        type="text"
+                                        value={item}
+                                        onChange={(e) => updateItem(index, e.target.value)}
+                                        onFocus={() => setFocusedIndex(index)}
+                                        className="flex-1 px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                        placeholder={`List item ${index + 1}`}
+                                    />
+                                    {items.length > 1 && (
+                                        <button 
+                                            onClick={() => removeItem(index)}
+                                            className="text-slate-300 hover:text-red-500 p-1"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                         </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const DetailsEditor = ({ data, onChange }) => {
+          return (
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <label className="block text-sm font-medium text-slate-700">Description Content</label>
+                <span className="text-xs text-slate-500">Supports basic HTML tags (&lt;strong&gt;, &lt;ul&gt;, etc)</span>
+              </div>
+              <textarea
+                value={data.content || ''}
+                onChange={(e) => onChange({ ...data, content: e.target.value })}
+                className="w-full h-32 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono text-sm"
+                placeholder="Type your details here. Use HTML tags for bolding or lists if needed, or just write paragraphs."
+              />
+              <div className="flex gap-2 text-xs">
+                <button 
+                  onClick={() => onChange({ ...data, content: (data.content || '') + '<strong>Bold Text</strong>' })}
+                  className="flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 transition-colors"
+                  title="Bold"
+                >
+                  <Bold size={14} /> Bold
+                </button>
+                <button 
+                  onClick={() => onChange({ ...data, content: (data.content || '') + '<ul>\n  <li>List Item 1</li>\n  <li>List Item 2</li>\n</ul>' })}
+                  className="flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 transition-colors"
+                  title="List"
+                >
+                  <List size={14} /> List
+                </button>
+                <button 
+                  onClick={() => onChange({ ...data, content: (data.content || '') + '<a href="#">Link Text</a>' })}
+                  className="flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 transition-colors"
+                  title="Link"
+                >
+                  <LinkIcon size={14} /> Link
+                </button>
+                <button 
+                  onClick={() => onChange({ ...data, content: (data.content || '') + '<br />' })}
+                  className="flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 transition-colors"
+                  title="Line Break"
+                >
+                  <CornerDownLeft size={14} /> Break
+                </button>
+              </div>
+            </div>
+          );
+        };
+
+        const CredentialsEditor = ({ data, onChange }) => {
+            const credentials = data.credentials || [{ role: 'Admin', email: 'admin@demo.com', password: '123' }];
+
+            const updateCred = (index, field, value) => {
+                const newCreds = [...credentials];
+                newCreds[index][field] = value;
+                onChange({ ...data, credentials: newCreds });
+            };
+
+            const addCred = () => {
+                onChange({ ...data, credentials: [...credentials, { role: '', email: '', password: '' }] });
+            };
+
+            const removeCred = (index) => {
+                if (credentials.length <= 1) return;
+                onChange({ ...data, credentials: credentials.filter((_, i) => i !== index) });
+            };
+
+            return (
+                <div className="space-y-4">
+                    <div className="grid grid-cols-1 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
+                            <input
+                                type="text"
+                                value={data.title || ''}
+                                onChange={(e) => onChange({ ...data, title: e.target.value })}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                placeholder="e.g. Demo Credentials"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Description (Optional)</label>
+                            <input
+                                type="text"
+                                value={data.description || ''}
+                                onChange={(e) => onChange({ ...data, description: e.target.value })}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                placeholder="Use these details to login..."
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Login Link (Optional)</label>
+                            <input
+                                type="text"
+                                value={data.loginUrl || ''}
+                                onChange={(e) => onChange({ ...data, loginUrl: e.target.value })}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                placeholder="https://your-demo-url.com/login"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="border-t border-slate-100 pt-4">
+                        <div className="flex justify-between items-center mb-2">
+                             <label className="text-sm font-medium text-slate-700">Credentials List</label>
+                             <button 
+                              onClick={addCred}
+                              className="text-xs flex items-center gap-1 bg-orange-100 text-orange-700 px-3 py-1.5 rounded hover:bg-orange-200 font-medium"
+                            >
+                              <Plus size={14} /> Add Row
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-2">
+                            {/* Header */}
+                            <div className="grid grid-cols-10 gap-2 text-xs font-semibold text-slate-500 px-2">
+                                <div className="col-span-3">Role / User</div>
+                                <div className="col-span-4">Email / Username</div>
+                                <div className="col-span-3">Password</div>
+                            </div>
+                            
+                            {credentials.map((cred, index) => (
+                                <div key={index} className="grid grid-cols-10 gap-2 items-center relative group">
+                                    <div className="col-span-3">
+                                        <input
+                                            type="text"
+                                            value={cred.role}
+                                            onChange={(e) => updateCred(index, 'role', e.target.value)}
+                                            placeholder="Admin"
+                                            className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                        />
+                                    </div>
+                                    <div className="col-span-4">
+                                        <input
+                                            type="text"
+                                            value={cred.email}
+                                            onChange={(e) => updateCred(index, 'email', e.target.value)}
+                                            placeholder="admin@test.com"
+                                            className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                        />
+                                    </div>
+                                    <div className="col-span-3 flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={cred.password}
+                                            onChange={(e) => updateCred(index, 'password', e.target.value)}
+                                            placeholder="123456"
+                                            className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                        />
+                                        {credentials.length > 1 && (
+                                            <button 
+                                                onClick={() => removeCred(index)}
+                                                className="text-slate-300 hover:text-red-500 p-1"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const ImageEditor = ({ data, onChange }) => (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Image URL</label>
+              <input
+                type="text"
+                value={data.url || ''}
+                onChange={(e) => onChange({ ...data, url: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                placeholder="https://your-server.com/banner.jpg"
+              />
+              <p className="text-xs text-slate-500 mt-1">Must be a direct link to an image (JPG, PNG, GIF).</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Alt Text</label>
+              <input
+                type="text"
+                value={data.alt || ''}
+                onChange={(e) => onChange({ ...data, alt: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                placeholder="Description of image for SEO"
+              />
+            </div>
+          </div>
+        );
+
+        const ImageRowEditor = ({ data, onChange }) => {
+          const images = data.images || [{ url: '', alt: '' }, { url: '', alt: '' }];
+
+          const updateImage = (index, field, value) => {
+            const newImages = [...images];
+            newImages[index][field] = value;
+            onChange({ ...data, images: newImages });
+          };
+
+          const addImage = () => {
+            onChange({ ...data, images: [...images, { url: '', alt: '' }] });
+          };
+
+          const removeImage = (index) => {
+            if (images.length <= 1) return;
+            onChange({ ...data, images: images.filter((_, i) => i !== index) });
+          };
+
+          return (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                 <label className="text-sm font-medium text-slate-700">Images in Row (Table Layout)</label>
+                 <button 
+                  onClick={addImage}
+                  className="text-xs flex items-center gap-1 bg-orange-100 text-orange-700 px-3 py-1.5 rounded hover:bg-orange-200 font-medium"
+                >
+                  <Plus size={14} /> Add Image
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {images.map((img, index) => (
+                  <div key={index} className="border border-slate-200 p-3 rounded bg-slate-50 relative group">
+                    <button 
+                      onClick={() => removeImage(index)}
+                      className="absolute top-2 right-2 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Remove Image"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                    <div className="space-y-2">
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">Image URL</label>
+                            <input
+                                type="text"
+                                value={img.url}
+                                onChange={(e) => updateImage(index, 'url', e.target.value)}
+                                className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                placeholder="https://..."
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">Alt Text</label>
+                            <input
+                                type="text"
+                                value={img.alt}
+                                onChange={(e) => updateImage(index, 'alt', e.target.value)}
+                                className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                placeholder="Image description"
+                            />
+                        </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="text-xs text-slate-500 bg-slate-100 p-2 rounded">
+                <strong>Note:</strong> These images will be arranged in a single row using a table. Each image will take up equal width.
+              </div>
+            </div>
+          );
+        };
+
+        const TableEditor = ({ data, onChange }) => {
+          const rows = data.rows || [['Feature', 'Status']]; 
+
+          const updateCell = (rowIndex, colIndex, value) => {
+            const newRows = [...rows];
+            newRows[rowIndex][colIndex] = value;
+            onChange({ ...data, rows: newRows });
+          };
+
+          const addRow = () => {
+            const colCount = rows[0].length;
+            onChange({ ...data, rows: [...rows, new Array(colCount).fill('')] });
+          };
+
+          const addColumn = () => {
+            const newRows = rows.map(row => [...row, '']);
+            onChange({ ...data, rows: newRows });
+          };
+
+          const removeRow = (index) => {
+            if (rows.length <= 1) return;
+            const newRows = rows.filter((_, i) => i !== index);
+            onChange({ ...data, rows: newRows });
+          };
+
+          const removeColumn = (colIndex) => {
+            if (rows[0].length <= 1) return;
+            const newRows = rows.map(row => row.filter((_, index) => index !== colIndex));
+            onChange({ ...data, rows: newRows });
+          };
+
+          return (
+            <div className="space-y-3 overflow-x-auto">
+              <div className="flex gap-2 mb-2">
+                <button onClick={addRow} className="flex items-center gap-1 text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded hover:bg-orange-200">
+                  <Plus size={12} /> Add Row
+                </button>
+                <button onClick={addColumn} className="flex items-center gap-1 text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded hover:bg-orange-200">
+                  <Plus size={12} /> Add Column
+                </button>
+              </div>
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr>
+                    {rows[0].map((_, colIndex) => (
+                      <td key={`col-action-${colIndex}`} className="p-1 text-center border-none">
+                        {rows[0].length > 1 && (
+                          <button 
+                            onClick={() => removeColumn(colIndex)}
+                            className="text-slate-300 hover:text-red-500 transition-colors p-1"
+                            title="Remove Column"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </td>
+                    ))}
+                    <td className="w-8"></td>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, rowIndex) => (
+                    <tr key={rowIndex}>
+                      {row.map((cell, colIndex) => (
+                        <td key={colIndex} className="p-1 border border-slate-200">
+                          <input
+                            type="text"
+                            value={cell}
+                            onChange={(e) => updateCell(rowIndex, colIndex, e.target.value)}
+                            className={`w-full p-1 focus:outline-none focus:bg-orange-50 ${rowIndex === 0 ? 'font-bold bg-slate-50' : ''}`}
+                            placeholder={rowIndex === 0 ? "Header" : "Data"}
+                          />
+                        </td>
+                      ))}
+                      <td className="w-8 border-none p-1 text-center">
+                        {rows.length > 1 && (
+                          <button onClick={() => removeRow(rowIndex)} className="text-red-300 hover:text-red-600">
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        };
+
+        const LogEditor = ({ data, onChange }) => {
+          const logs = data.logs || [];
+
+          const addLog = () => {
+            onChange({
+              ...data,
+              logs: [{ version: '', date: '', changes: '' }, ...logs]
+            });
+          };
+
+          const updateLog = (index, field, value) => {
+            const newLogs = [...logs];
+            newLogs[index][field] = value;
+            onChange({ ...data, logs: newLogs });
+          };
+
+          const removeLog = (index) => {
+            const newLogs = logs.filter((_, i) => i !== index);
+            onChange({ ...data, logs: newLogs });
+          };
+
+          return (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                 <label className="text-sm font-medium text-slate-700">Versions</label>
+                 <button 
+                  onClick={addLog}
+                  className="text-xs flex items-center gap-1 bg-orange-100 text-orange-700 px-3 py-1.5 rounded hover:bg-orange-200 font-medium"
+                >
+                  <Plus size={14} /> Add Version
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                {logs.map((log, index) => (
+                  <div key={index} className="border border-slate-200 p-4 rounded-lg bg-slate-50 relative group">
+                    <button 
+                      onClick={() => removeLog(index)}
+                      className="absolute top-2 right-2 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Remove Version"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1">Version Number</label>
+                        <input
+                          type="text"
+                          value={log.version}
+                          onChange={(e) => updateLog(index, 'version', e.target.value)}
+                          placeholder="2.0.0"
+                          className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:ring-1 focus:ring-orange-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1">Release Title / Date</label>
+                        <input
+                          type="text"
+                          value={log.date}
+                          onChange={(e) => updateLog(index, 'date', e.target.value)}
+                          placeholder="CodeCanyon Release Update"
+                          className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:ring-1 focus:ring-orange-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Changelog Details (Markdown style)</label>
+                      <textarea
+                        value={log.changes}
+                        onChange={(e) => updateLog(index, 'changes', e.target.value)}
+                        placeholder="### Security & Configuration&#10;- Removed hardcoded API URL&#10;- Enhanced security"
+                        className="w-full px-3 py-2 border border-slate-300 rounded text-sm h-48 font-mono focus:ring-1 focus:ring-orange-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        };
+
+        const GroupEditor = ({ data, onChange }) => {
+            const groupBlocks = data.blocks || [];
+
+            const addBlockToGroup = (type) => {
+                const newBlock = {
+                    id: Date.now().toString() + Math.random(),
+                    type,
+                    data: type === BlockTypes.TABLE 
+                        ? { rows: [['Feature', 'Status']] }
+                        : type === BlockTypes.TITLE
+                        ? { tag: 'h3', text: 'Group Title' }
+                        : type === BlockTypes.SUBHEADING 
+                        ? { tag: 'h4', text: 'Sub Heading' }
+                        : type === BlockTypes.LIST
+                        ? { title: 'Group List', items: ['Item 1', 'Item 2'], listType: 'ul' }
+                        : {}
+                };
+                onChange({ ...data, blocks: [...groupBlocks, newBlock] });
+            };
+
+            const updateGroupBlock = (id, newData) => {
+                const newBlocks = groupBlocks.map(b => b.id === id ? { ...b, data: newData } : b);
+                onChange({ ...data, blocks: newBlocks });
+            };
+
+            const removeGroupBlock = (id) => {
+                const newBlocks = groupBlocks.filter(b => b.id !== id);
+                onChange({ ...data, blocks: newBlocks });
+            };
+
+            return (
+                <div className="space-y-4">
+                    <div className="flex gap-2 flex-wrap">
+                        <button onClick={() => addBlockToGroup(BlockTypes.TITLE)} className="flex items-center gap-1 text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">
+                           <TypeIcon size={12} /> Title
+                        </button>
+                        <button onClick={() => addBlockToGroup(BlockTypes.SUBHEADING)} className="flex items-center gap-1 text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">
+                           <HeadingIcon size={12} /> Sub Heading
+                        </button>
+                        <button onClick={() => addBlockToGroup(BlockTypes.DETAILS)} className="flex items-center gap-1 text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">
+                           <FileText size={12} /> Text
+                        </button>
+                        <button onClick={() => addBlockToGroup(BlockTypes.IMAGE)} className="flex items-center gap-1 text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">
+                           <ImageIcon size={12} /> Image
+                        </button>
+                        <button onClick={() => addBlockToGroup(BlockTypes.TABLE)} className="flex items-center gap-1 text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">
+                           <TableIcon size={12} /> Table
+                        </button>
+                        <button onClick={() => addBlockToGroup(BlockTypes.LIST)} className="flex items-center gap-1 text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">
+                           <List size={12} /> List
+                        </button>
+                    </div>
+                    
+                    <div className="space-y-3 p-3 bg-slate-100 rounded-lg border border-slate-200">
+                        {groupBlocks.length === 0 && <div className="text-center text-xs text-slate-400 py-2">Empty Group</div>}
+                        {groupBlocks.map((block) => (
+                            <div key={block.id} className="bg-white p-3 rounded shadow-sm relative group/item">
+                                <button 
+                                    onClick={() => removeGroupBlock(block.id)}
+                                    className="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover/item:opacity-100 transition-opacity"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                                
+                                <div className="mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wide">{block.type}</div>
+                                
+                                {block.type === BlockTypes.TITLE && <TitleEditor data={block.data} onChange={(d) => updateGroupBlock(block.id, d)} />}
+                                {block.type === BlockTypes.SUBHEADING && <SubHeadingEditor data={block.data} onChange={(d) => updateGroupBlock(block.id, d)} />}
+                                {block.type === BlockTypes.DETAILS && <DetailsEditor data={block.data} onChange={(d) => updateGroupBlock(block.id, d)} />}
+                                {block.type === BlockTypes.IMAGE && <ImageEditor data={block.data} onChange={(d) => updateGroupBlock(block.id, d)} />}
+                                {block.type === BlockTypes.TABLE && <TableEditor data={block.data} onChange={(d) => updateGroupBlock(block.id, d)} />}
+                                {block.type === BlockTypes.LIST && <ListEditor data={block.data} onChange={(d) => updateGroupBlock(block.id, d)} />}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+
+        // --- MAIN APPLICATION COMPONENT ---
+
+        const DEFAULT_BLOCKS = [
+            { id: '1', type: BlockTypes.TITLE, data: { text: 'Awesome Plugin - Features', tag: 'h2' } },
+            { id: '2', type: BlockTypes.DETAILS, data: { content: 'This is a description of your item. It is <strong>highly customizable</strong> and easy to use.' } }
+        ];
+
+        function CodeCanyonGenerator() {
+          const [blocks, setBlocks] = useState(DEFAULT_BLOCKS);
+          const [activeTab, setActiveTab] = useState('editor'); // 'editor', 'structure', 'preview', 'code'
+          const [copied, setCopied] = useState(false);
+          const [tempCode, setTempCode] = useState(''); // For the Source Code editor
+          const [expandedIds, setExpandedIds] = useState(new Set()); // Track expanded structure items
+          const [previewModeIds, setPreviewModeIds] = useState({}); // Track which blocks are in preview mode
+          
+          // New states for the Update button animation
+          const [isUpdating, setIsUpdating] = useState(false);
+          const [updateSuccess, setUpdateSuccess] = useState(false);
+
+          // Auto-save states
+          const [isSaving, setIsSaving] = useState(false);
+          const [isLoaded, setIsLoaded] = useState(false);
+
+          // Drag and Drop states for Structure View
+          const dragItem = useRef();
+          const dragOverItem = useRef();
+
+          // --- Load from LocalStorage on Mount ---
+          useEffect(() => {
+            const saved = localStorage.getItem('cc_generator_data');
+            if (saved) {
+                try {
+                    setBlocks(JSON.parse(saved));
+                } catch (e) {
+                    console.error("Failed to load saved data", e);
+                }
+            }
+            setIsLoaded(true);
+          }, []);
+
+          // --- Auto-Save Effect ---
+          useEffect(() => {
+            if (!isLoaded) return; // Don't save before initial load
+
+            const saveToStorage = setTimeout(() => {
+                setIsSaving(true);
+                localStorage.setItem('cc_generator_data', JSON.stringify(blocks));
+                
+                // Show saving state for at least 800ms so user sees it
+                setTimeout(() => {
+                    setIsSaving(false);
+                }, 800);
+            }, 1000); // Debounce 1s
+
+            return () => clearTimeout(saveToStorage);
+          }, [blocks, isLoaded]);
+
+          const handleReset = () => {
+            if (window.confirm("Are you sure you want to reset? This will delete all current blocks and clear saved data.")) {
+                setBlocks(DEFAULT_BLOCKS);
+                localStorage.removeItem('cc_generator_data');
+            }
+          };
+
+          const addBlock = (type) => {
+            const newBlock = {
+              id: Date.now().toString(),
+              type,
+              data: type === BlockTypes.TABLE 
+                ? { rows: [['Feature', 'Description'], ['Responsive', 'Yes']] }
+                : type === BlockTypes.LOG
+                ? { logs: [{ version: '1.0.0', date: 'Initial Release', changes: '- First release' }] }
+                : type === BlockTypes.IMAGE_ROW
+                ? { images: [{ url: '', alt: '' }, { url: '', alt: '' }] }
+                : type === BlockTypes.CREDENTIALS
+                ? { title: 'Demo Credentials', description: '', loginUrl: '', credentials: [{ role: 'Admin', email: 'admin@demo.com', password: '123' }] }
+                : type === BlockTypes.SUBHEADING
+                ? { tag: 'h3', text: '' }
+                : type === BlockTypes.TITLE
+                ? { tag: 'h2', text: '' }
+                : type === BlockTypes.GROUP
+                ? { blocks: [] }
+                : type === BlockTypes.LIST
+                ? { title: 'Key Features', items: ['Feature 1', 'Feature 2'], listType: 'ul' }
+                : type === BlockTypes.BREAK_LINE
+                ? {}
+                : {}
+            };
+            setBlocks([...blocks, newBlock]);
+          };
+
+          const updateBlock = (id, newData) => {
+            setBlocks(blocks.map(b => b.id === id ? { ...b, data: newData } : b));
+          };
+          
+          const updateBlockName = (id, name) => {
+            setBlocks(blocks.map(b => b.id === id ? { ...b, name } : b));
+          };
+
+          const removeBlock = (id) => {
+            setBlocks(blocks.filter(b => b.id !== id));
+          };
+
+          const moveBlock = (index, direction) => {
+            const newBlocks = [...blocks];
+            if (direction === 'up' && index > 0) {
+              [newBlocks[index], newBlocks[index - 1]] = [newBlocks[index - 1], newBlocks[index]];
+            } else if (direction === 'down' && index < newBlocks.length - 1) {
+              [newBlocks[index], newBlocks[index + 1]] = [newBlocks[index + 1], newBlocks[index]];
+            }
+            setBlocks(newBlocks);
+          };
+
+          const toggleBlockPreview = (id, mode) => {
+             setPreviewModeIds(prev => ({
+                 ...prev,
+                 [id]: mode === 'preview'
+             }));
+          };
+
+          const toggleExpand = (id) => {
+            const newExpanded = new Set(expandedIds);
+            if (newExpanded.has(id)) {
+                newExpanded.delete(id);
+            } else {
+                newExpanded.add(id);
+            }
+            setExpandedIds(newExpanded);
+          };
+
+          // Drag and Drop Handlers
+          const onDragStart = (e, position) => {
+            dragItem.current = position;
+            e.target.classList.add('dragging');
+          };
+
+          const onDragEnter = (e, position) => {
+            dragOverItem.current = position;
+            const listItems = document.querySelectorAll('.draggable-item');
+            listItems.forEach(item => item.classList.remove('drag-over'));
+            // Add visual cue
+            const currentItem = document.getElementById(`block-${position}`);
+            if(currentItem) currentItem.classList.add('drag-over');
+          };
+
+          const onDragEnd = (e) => {
+            e.target.classList.remove('dragging');
+            const listItems = document.querySelectorAll('.draggable-item');
+            listItems.forEach(item => item.classList.remove('drag-over'));
+
+            const newBlocks = [...blocks];
+            const dragItemContent = newBlocks[dragItem.current];
+            newBlocks.splice(dragItem.current, 1);
+            newBlocks.splice(dragOverItem.current, 0, dragItemContent);
+            
+            dragItem.current = null;
+            dragOverItem.current = null;
+            setBlocks(newBlocks);
+          };
+
+          const generateHTML = (currentBlocks = blocks) => {
+            let html = '';
+            currentBlocks.forEach(block => {
+              html += generateSingleBlockHTML(block);
+            });
+            return formatHTML(html);
+          };
+
+          const copyToClipboard = () => {
+            const code = generateHTML();
+            navigator.clipboard.writeText(code);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          };
+
+          useEffect(() => {
+            if (activeTab !== 'code') {
+              setTempCode(generateHTML());
+            } else {
+                setTempCode(generateHTML());
+            }
+          }, [activeTab]); 
+
+          const handleApplyCode = () => {
+            setIsUpdating(true);
+            setUpdateSuccess(false);
+
+            setTimeout(() => {
+              try {
+                  const newBlocks = parseHtmlToBlocks(tempCode);
+                  setBlocks(newBlocks);
+                  // LOGICAL UPDATE: Re-format code to match new blocks
+                  const formatted = generateHTML(newBlocks);
+                  setTempCode(formatted);
+                  
+                  setUpdateSuccess(true);
+                  setTimeout(() => setUpdateSuccess(false), 2000);
+              } catch (e) {
+                  alert('Error parsing HTML. Please ensure it follows basic structures.');
+              } finally {
+                  setIsUpdating(false);
+              }
+            }, 600);
+          };
+
+          const currentGeneratedHTML = generateHTML();
+          const hasChanges = tempCode !== currentGeneratedHTML;
+
+          return (
+            <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col md:flex-row">
+              
+              {/* Insert Preview CSS for Structure View Tooltips/Expanded Items */}
+              <style>{PREVIEW_CSS}</style>
+
+              {/* Sidebar / Controls */}
+              <div className="w-full md:w-64 bg-white border-r border-slate-200 flex flex-col h-auto md:h-screen sticky top-0 z-10">
+                <div className="p-5 border-b border-slate-100">
+                  <div className="flex items-center gap-2 text-orange-600 font-bold text-xl">
+                    <CodeIcon size={24} />
+                    <span>CC Generator</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">Envato Description Tool</p>
+                </div>
+
+                <div className="p-5 flex-1 overflow-y-auto">
+                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Add Blocks</h3>
+                  <div className="grid grid-cols-1 gap-2">
+                    <button onClick={() => addBlock(BlockTypes.TITLE)} className="flex items-center gap-3 px-4 py-3 bg-slate-50 hover:bg-orange-50 text-slate-700 hover:text-orange-700 rounded-lg border border-slate-200 transition-colors text-left">
+                      <TypeIcon size={18} />
+                      <span className="text-sm font-medium">Title / Heading</span>
+                    </button>
+                    <button onClick={() => addBlock(BlockTypes.SUBHEADING)} className="flex items-center gap-3 px-4 py-3 bg-slate-50 hover:bg-orange-50 text-slate-700 hover:text-orange-700 rounded-lg border border-slate-200 transition-colors text-left">
+                      <HeadingIcon size={18} />
+                      <span className="text-sm font-medium">Sub Heading</span>
+                    </button>
+                    <button onClick={() => addBlock(BlockTypes.DETAILS)} className="flex items-center gap-3 px-4 py-3 bg-slate-50 hover:bg-orange-50 text-slate-700 hover:text-orange-700 rounded-lg border border-slate-200 transition-colors text-left">
+                      <FileText size={18} />
+                      <span className="text-sm font-medium">Details / HTML</span>
+                    </button>
+                    <button onClick={() => addBlock(BlockTypes.IMAGE)} className="flex items-center gap-3 px-4 py-3 bg-slate-50 hover:bg-orange-50 text-slate-700 hover:text-orange-700 rounded-lg border border-slate-200 transition-colors text-left">
+                      <ImageIcon size={18} />
+                      <span className="text-sm font-medium">Image</span>
+                    </button>
+                    <button onClick={() => addBlock(BlockTypes.IMAGE_ROW)} className="flex items-center gap-3 px-4 py-3 bg-slate-50 hover:bg-orange-50 text-slate-700 hover:text-orange-700 rounded-lg border border-slate-200 transition-colors text-left">
+                      <Images size={18} />
+                      <span className="text-sm font-medium">Multi-Image Row</span>
+                    </button>
+                    <button onClick={() => addBlock(BlockTypes.TABLE)} className="flex items-center gap-3 px-4 py-3 bg-slate-50 hover:bg-orange-50 text-slate-700 hover:text-orange-700 rounded-lg border border-slate-200 transition-colors text-left">
+                      <TableIcon size={18} />
+                      <span className="text-sm font-medium">Data Table</span>
+                    </button>
+                    <button onClick={() => addBlock(BlockTypes.LIST)} className="flex items-center gap-3 px-4 py-3 bg-slate-50 hover:bg-orange-50 text-slate-700 hover:text-orange-700 rounded-lg border border-slate-200 transition-colors text-left">
+                      <List size={18} />
+                      <span className="text-sm font-medium">List</span>
+                    </button>
+                    <button onClick={() => addBlock(BlockTypes.LOG)} className="flex items-center gap-3 px-4 py-3 bg-slate-50 hover:bg-orange-50 text-slate-700 hover:text-orange-700 rounded-lg border border-slate-200 transition-colors text-left">
+                      <History size={18} />
+                      <span className="text-sm font-medium">Change Log</span>
+                    </button>
+                    <button onClick={() => addBlock(BlockTypes.CREDENTIALS)} className="flex items-center gap-3 px-4 py-3 bg-slate-50 hover:bg-orange-50 text-slate-700 hover:text-orange-700 rounded-lg border border-slate-200 transition-colors text-left">
+                      <Lock size={18} />
+                      <span className="text-sm font-medium">Credentials</span>
+                    </button>
+                    {/* NEW GROUP BUTTON */}
+                    <button onClick={() => addBlock(BlockTypes.GROUP)} className="flex items-center gap-3 px-4 py-3 bg-slate-50 hover:bg-orange-50 text-slate-700 hover:text-orange-700 rounded-lg border border-slate-200 transition-colors text-left">
+                      <Folder size={18} />
+                      <span className="text-sm font-medium">Group Block</span>
+                    </button>
+                    <button onClick={() => addBlock(BlockTypes.BREAK_LINE)} className="flex items-center gap-3 px-4 py-3 bg-slate-50 hover:bg-orange-50 text-slate-700 hover:text-orange-700 rounded-lg border border-slate-200 transition-colors text-left">
+                      <Minus size={18} />
+                      <span className="text-sm font-medium">Break Line</span>
+                    </button>
+                  </div>
+
+                  <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100 text-blue-800 text-xs">
+                    <div className="flex items-center gap-2 font-bold mb-1">
+                      <AlertCircle size={14} />
+                      Reminder
+                    </div>
+                    CodeCanyon forbids CSS. This tool generates pure HTML tags only to ensure your item is not soft-rejected.
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Content Area */}
+              <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                
+                {/* Header Tabs */}
+                <div className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shrink-0">
+                  <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
+                    <button 
+                      onClick={() => setActiveTab('editor')}
+                      className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'editor' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      Editor
+                    </button>
+                    {/* NEW STRUCTURE TAB */}
+                    <button 
+                      onClick={() => setActiveTab('structure')}
+                      className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'structure' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      <span className="flex items-center gap-2"><List size={14}/> Structure</span>
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('preview')}
+                      className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'preview' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      <span className="flex items-center gap-2"><Eye size={14}/> Preview</span>
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('code')}
+                      className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'code' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      <span className="flex items-center gap-2"><CodeIcon size={14}/> HTML Source</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                      {/* Global Actions: Preview, Save, Reset */}
+                      <div className="flex items-center gap-2 bg-white border border-slate-200 p-1 rounded-lg shadow-sm">
+                          {/* PREVIEW TOGGLE */}
+                          <button 
+                              onClick={() => setActiveTab(activeTab === 'preview' ? 'editor' : 'preview')}
+                              className={`p-2 rounded-md transition-all ${activeTab === 'preview' ? 'text-orange-600 bg-orange-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                              title={activeTab === 'preview' ? "Back to Editor" : "Preview Description"}
+                          >
+                              {activeTab === 'preview' ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+
+                          <div className="w-px h-4 bg-slate-200 mx-1"></div>
+
+                          {/* SAVE STATUS */}
+                          <div 
+                              className={`p-2 rounded-md transition-all cursor-help ${isSaving ? 'text-orange-500' : 'text-green-500'}`}
+                              title={isSaving ? "Saving..." : "Auto Saved to LocalStorage"}
+                          >
+                             {isSaving ? <Loader2 size={18} className="animate-spin" /> : <CloudCheck size={18} />}
+                          </div>
+
+                          {/* RESET */}
+                          <button 
+                              onClick={handleReset}
+                              className="p-2 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                              title="Reset Workspace"
+                          >
+                              <Eraser size={18} />
+                          </button>
+                      </div>
+                      
+                      {/* Contextual Actions (Code View) */}
+                      {activeTab === 'code' && (
+                         <div className="flex gap-2 border-l border-slate-200 pl-3">
+                             <button
+                               onClick={handleApplyCode}
+                               disabled={isUpdating || !hasChanges}
+                               className={`flex items-center gap-2 p-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                                 updateSuccess 
+                                   ? 'bg-green-600 text-white shadow-sm ring-2 ring-green-100' 
+                                   : !hasChanges
+                                       ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                       : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md'
+                               } ${isUpdating ? 'opacity-80 cursor-wait' : ''}`}
+                               title={hasChanges ? "Update Blocks from HTML" : "No changes to update"}
+                             >
+                               {isUpdating ? (
+                                 <React.Fragment>
+                                    <Loader2 size={18} className="animate-spin" />
+                                 </React.Fragment>
+                               ) : updateSuccess ? (
+                                 <React.Fragment>
+                                    <Check size={18} />
+                                 </React.Fragment>
+                               ) : (
+                                 <React.Fragment>
+                                    <Play size={18} />
+                                 </React.Fragment>
+                               )}
+                             </button>
+                             <button 
+                               onClick={copyToClipboard}
+                               className={`flex items-center gap-2 p-2 rounded-lg text-sm font-medium transition-colors ${copied ? 'bg-green-100 text-green-700' : 'bg-orange-600 text-white hover:bg-orange-700'}`}
+                               title="Copy HTML to Clipboard"
+                             >
+                               {copied ? <Check size={18} /> : <Copy size={18} />}
+                             </button>
+                         </div>
+                      )}
+                  </div>
+                </div>
+
+                {/* Content Body */}
+                <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+                  
+                  {/* EDITOR VIEW */}
+                  {activeTab === 'editor' && (
+                    <div className="max-w-3xl mx-auto space-y-4 pb-20">
+                      {blocks.length === 0 && (
+                        <div className="text-center py-20 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
+                          <p>No blocks added yet.</p>
+                          <p className="text-sm">Select a type from the sidebar to start building.</p>
+                        </div>
+                      )}
+
+                      {blocks.map((block, index) => {
+                         const isPreviewMode = previewModeIds[block.id];
+                         return (
+                        <div key={block.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group hover:shadow-md transition-shadow">
+                          {/* Block Header */}
+                          <div className="bg-slate-50 px-4 py-2 border-b border-slate-100 flex justify-between items-center group/header">
+                            <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wide flex-1 mr-4">
+                              {block.type === BlockTypes.TITLE && <TypeIcon size={14} className="shrink-0" />}
+                              {block.type === BlockTypes.SUBHEADING && <HeadingIcon size={14} className="shrink-0" />}
+                              {block.type === BlockTypes.DETAILS && <FileText size={14} className="shrink-0" />}
+                              {block.type === BlockTypes.IMAGE && <ImageIcon size={14} className="shrink-0" />}
+                              {block.type === BlockTypes.IMAGE_ROW && <Images size={14} className="shrink-0" />}
+                              {block.type === BlockTypes.TABLE && <TableIcon size={14} className="shrink-0" />}
+                              {block.type === BlockTypes.LOG && <History size={14} className="shrink-0" />}
+                              {block.type === BlockTypes.CREDENTIALS && <Lock size={14} className="shrink-0" />}
+                              {block.type === BlockTypes.BREAK_LINE && <Minus size={14} className="shrink-0" />}
+                              {block.type === BlockTypes.GROUP && <Folder size={14} className="shrink-0" />}
+                              {block.type === BlockTypes.LIST && <List size={14} className="shrink-0" />}
+                              
+                              <input
+                                  type="text"
+                                  value={block.name || ""}
+                                  placeholder={getBlockLabel(block.type)}
+                                  onChange={(e) => updateBlockName(block.id, e.target.value)}
+                                  className="bg-transparent border-none p-0 text-xs font-bold text-slate-500 uppercase tracking-wide w-full focus:ring-0 cursor-text placeholder-slate-400 hover:text-slate-700 transition-colors"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                {/* Actions Group (Move/Delete) + Separator - Only visible on hover */}
+                                <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                  <button 
+                                    onClick={() => moveBlock(index, 'up')} 
+                                    disabled={index === 0}
+                                    className="p-1.5 text-slate-400 hover:bg-white hover:text-slate-700 rounded disabled:opacity-30 transition-colors"
+                                    title="Move Up"
+                                  >
+                                    <MoveUp size={14} />
+                                  </button>
+                                  <button 
+                                    onClick={() => moveBlock(index, 'down')} 
+                                    disabled={index === blocks.length - 1}
+                                    className="p-1.5 text-slate-400 hover:bg-white hover:text-slate-700 rounded disabled:opacity-30 transition-colors"
+                                    title="Move Down"
+                                  >
+                                    <MoveDown size={14} />
+                                  </button>
+                                  <button 
+                                    onClick={() => removeBlock(block.id)}
+                                    className="p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600 rounded transition-colors"
+                                    title="Delete Block"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                  
+                                  {/* Separator moved INSIDE the opacity group so it hides/shows logically */}
+                                  <div className="h-4 w-px bg-slate-300 mx-1"></div>
+                                </div>
+
+                                {/* Toggle Preview Mode - Updated Professional Look */}
+                                <div className="flex bg-slate-100 rounded-lg p-1 border border-slate-200/60">
+                                    <button
+                                        onClick={() => toggleBlockPreview(block.id, 'edit')}
+                                        className={`px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 shadow-sm ${!isPreviewMode ? 'bg-white text-slate-700 ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700 shadow-none'}`}
+                                    >
+                                        Edit
+                                    </button>
+                                    <button
+                                        onClick={() => toggleBlockPreview(block.id, 'preview')}
+                                        className={`px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 shadow-sm ${isPreviewMode ? 'bg-white text-slate-700 ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700 shadow-none'}`}
+                                    >
+                                        Preview
+                                    </button>
+                                </div>
+                            </div>
+                          </div>
+                          
+                          {/* Block Content */}
+                          <div className="p-4">
+                            {isPreviewMode ? (
+                                <div 
+                                    className="cc-preview p-2 border border-dashed border-slate-200 rounded bg-slate-50/50"
+                                    dangerouslySetInnerHTML={{ __html: generateSingleBlockHTML(block) }}
+                                />
+                            ) : (
+                                <React.Fragment>
+                                    {block.type === BlockTypes.TITLE && (
+                                      <TitleEditor data={block.data} onChange={(d) => updateBlock(block.id, d)} />
+                                    )}
+                                    {block.type === BlockTypes.SUBHEADING && (
+                                      <SubHeadingEditor data={block.data} onChange={(d) => updateBlock(block.id, d)} />
+                                    )}
+                                    {block.type === BlockTypes.DETAILS && (
+                                      <DetailsEditor data={block.data} onChange={(d) => updateBlock(block.id, d)} />
+                                    )}
+                                    {block.type === BlockTypes.IMAGE && (
+                                      <ImageEditor data={block.data} onChange={(d) => updateBlock(block.id, d)} />
+                                    )}
+                                    {block.type === BlockTypes.IMAGE_ROW && (
+                                      <ImageRowEditor data={block.data} onChange={(d) => updateBlock(block.id, d)} />
+                                    )}
+                                    {block.type === BlockTypes.TABLE && (
+                                      <TableEditor data={block.data} onChange={(d) => updateBlock(block.id, d)} />
+                                    )}
+                                    {block.type === BlockTypes.LOG && (
+                                      <LogEditor data={block.data} onChange={(d) => updateBlock(block.id, d)} />
+                                    )}
+                                    {block.type === BlockTypes.CREDENTIALS && (
+                                      <CredentialsEditor data={block.data} onChange={(d) => updateBlock(block.id, d)} />
+                                    )}
+                                    {block.type === BlockTypes.BREAK_LINE && (
+                                        <div className="p-4 text-center text-slate-400">
+                                            <hr className="border-t-2 border-dashed border-slate-200 my-2" />
+                                            <span className="text-xs uppercase font-bold tracking-wider">Horizontal Line Separator</span>
+                                        </div>
+                                    )}
+                                    {block.type === BlockTypes.GROUP && (
+                                        <GroupEditor data={block.data} onChange={(d) => updateBlock(block.id, d)} />
+                                    )}
+                                    {block.type === BlockTypes.LIST && (
+                                        <ListEditor data={block.data} onChange={(d) => updateBlock(block.id, d)} />
+                                    )}
+                                </React.Fragment>
+                            )}
+                          </div>
+                        </div>
+                      );
+                      })}
+                    </div>
+                  )}
+
+                  {/* STRUCTURE VIEW */}
+                  {activeTab === 'structure' && (
+                    <div className="max-w-2xl mx-auto pb-20">
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <List size={20} /> Reorder & Organize
+                            </h2>
+                            <p className="text-sm text-slate-500 mb-6">Drag blocks to reorder them or use the up/down arrows.</p>
+                            
+                            <div className="space-y-2">
+                                {blocks.map((block, index) => {
+                                    // Calculate Preview Text for this block
+                                    const previewText = (() => {
+                                        switch(block.type) {
+                                            case BlockTypes.TITLE: return block.data.text;
+                                            case BlockTypes.SUBHEADING: return block.data.text;
+                                            case BlockTypes.DETAILS: return block.data.content?.replace(/<[^>]+>/g, '') || 'No content';
+                                            case BlockTypes.IMAGE: return block.data.url;
+                                            case BlockTypes.IMAGE_ROW: return `${(block.data.images || []).length} images`;
+                                            case BlockTypes.TABLE: return `${(block.data.rows || []).length} rows`;
+                                            case BlockTypes.CREDENTIALS: return `${block.data.title}`;
+                                            case BlockTypes.GROUP: return `${(block.data.blocks || []).length} items inside`;
+                                            case BlockTypes.LIST: return `${(block.data.items || []).length} items`;
+                                            default: return '';
+                                        }
+                                    })();
+
+                                    const isExpanded = expandedIds.has(block.id);
+
+                                    return (
+                                    <div 
+                                        key={block.id}
+                                        id={`block-${index}`}
+                                        className="draggable-item flex flex-col bg-slate-50 border border-slate-200 rounded-lg hover:border-orange-200 hover:shadow-sm transition-all cursor-move select-none"
+                                        draggable
+                                        onDragStart={(e) => onDragStart(e, index)}
+                                        onDragEnter={(e) => onDragEnter(e, index)}
+                                        onDragEnd={onDragEnd}
+                                        onDragOver={(e) => e.preventDefault()}
+                                    >
+                                        {/* Main Row Content */}
+                                        <div className="flex items-center gap-3 p-3">
+                                            <div className="text-slate-400 cursor-grab active:cursor-grabbing">
+                                                <GripVertical size={20} />
+                                            </div>
+                                            
+                                            <div className="flex-1 flex items-center gap-3 overflow-hidden">
+                                                <div className="p-2 bg-white rounded border border-slate-200 text-slate-500 shrink-0">
+                                                    {block.type === BlockTypes.TITLE && <TypeIcon size={16} />}
+                                                    {block.type === BlockTypes.SUBHEADING && <HeadingIcon size={16} />}
+                                                    {block.type === BlockTypes.DETAILS && <FileText size={16} />}
+                                                    {block.type === BlockTypes.IMAGE && <ImageIcon size={16} />}
+                                                    {block.type === BlockTypes.IMAGE_ROW && <Images size={16} />}
+                                                    {block.type === BlockTypes.TABLE && <TableIcon size={16} />}
+                                                    {block.type === BlockTypes.LOG && <History size={16} />}
+                                                    {block.type === BlockTypes.CREDENTIALS && <Lock size={16} />}
+                                                    {block.type === BlockTypes.BREAK_LINE && <Minus size={16} />}
+                                                    {block.type === BlockTypes.GROUP && <Folder size={16} />}
+                                                    {block.type === BlockTypes.LIST && <List size={16} />}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="text-sm font-bold text-slate-700 capitalize">
+                                                        {block.name || getBlockLabel(block.type)}
+                                                    </div>
+                                                    <div 
+                                                        className="text-xs text-slate-400 truncate max-w-full cursor-help"
+                                                        title={previewText} // Tooltip on hover
+                                                    >
+                                                        {previewText || block.id}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-1 border-l border-slate-200 pl-3">
+                                                {/* Expand Button */}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation(); // Prevent drag start if clicking button
+                                                        toggleExpand(block.id);
+                                                    }}
+                                                    className={`p-1.5 rounded transition-colors ${isExpanded ? 'text-orange-600 bg-orange-50' : 'text-slate-400 hover:bg-white hover:text-slate-700'}`}
+                                                    title={isExpanded ? "Collapse Content" : "Preview Content"}
+                                                >
+                                                    {isExpanded ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                </button>
+
+                                                <button 
+                                                    onClick={() => moveBlock(index, 'up')} 
+                                                    disabled={index === 0}
+                                                    className="p-1.5 text-slate-400 hover:bg-white hover:text-slate-700 rounded disabled:opacity-30"
+                                                >
+                                                    <MoveUp size={16} />
+                                                </button>
+                                                <button 
+                                                    onClick={() => moveBlock(index, 'down')} 
+                                                    disabled={index === blocks.length - 1}
+                                                    className="p-1.5 text-slate-400 hover:bg-white hover:text-slate-700 rounded disabled:opacity-30"
+                                                >
+                                                    <MoveDown size={16} />
+                                                </button>
+                                                <button 
+                                                    onClick={() => removeBlock(block.id)}
+                                                    className="p-1.5 text-red-300 hover:bg-red-50 hover:text-red-600 rounded ml-1"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Expanded Content Preview - True HTML Render */}
+                                        {isExpanded && (
+                                            <div className="px-3 pb-3 pt-0 text-xs border-t border-slate-100 bg-slate-50/50">
+                                                <div 
+                                                    className="cc-preview mt-2 p-4 bg-white rounded border border-slate-200 overflow-x-auto max-h-60 overflow-y-auto"
+                                                    dangerouslySetInnerHTML={{ __html: generateSingleBlockHTML(block) }}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                  )}
+
+                  {/* PREVIEW VIEW */}
+                  {activeTab === 'preview' && (
+                    <div className="max-w-3xl mx-auto bg-white shadow-sm border border-slate-200 rounded-xl min-h-[500px] overflow-hidden">
+                      {/* Fake CodeCanyon Header for context */}
+                      <div className="bg-[#262626] px-6 py-4 border-b border-gray-200">
+                        <div className="h-4 w-32 bg-gray-600 rounded opacity-50"></div>
+                      </div>
+                      
+                      <div className="p-8">
+                        {/* Emulate CodeCanyon Basic Styling */}
+                        <div 
+                          className="cc-preview"
+                          dangerouslySetInnerHTML={{ __html: generateHTML() }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CODE VIEW */}
+                  {activeTab === 'code' && (
+                    <div className="max-w-4xl mx-auto h-full pb-10 flex flex-col gap-2">
+                      <div className="bg-blue-50 text-blue-800 p-3 rounded-lg text-sm border border-blue-100 flex items-center gap-2">
+                        <AlertCircle size={16} />
+                        You can edit the HTML below. Click "Update Blocks" to reflect changes in the Editor and Preview.
+                      </div>
+                      <textarea 
+                        className="w-full h-full p-4 font-mono text-sm bg-slate-900 text-green-400 rounded-xl focus:outline-none resize-none"
+                        value={tempCode}
+                        onChange={(e) => setTempCode(e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<CodeCanyonGenerator />);
+    </script>
+</body>
+</html>
