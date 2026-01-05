@@ -81,6 +81,8 @@
         const Folder = (props) => <IconBase {...props}><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></IconBase>;
         const ChevronDown = (props) => <IconBase {...props}><polyline points="6 9 12 15 18 9"/></IconBase>;
         const ChevronUp = (props) => <IconBase {...props}><polyline points="18 15 12 9 6 15"/></IconBase>;
+        const ChevronRight = (props) => <IconBase {...props}><polyline points="9 18 15 12 9 6" /></IconBase>;
+        const ChevronLeft = (props) => <IconBase {...props}><polyline points="15 18 9 12 15 6" /></IconBase>;
         
         const Bold = (props) => <IconBase {...props}><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></IconBase>;
         const LinkIcon = (props) => <IconBase {...props}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></IconBase>;
@@ -326,6 +328,15 @@
             currentDetails = '';
           };
 
+          // Helper to get next meaningful element (skipping empty text nodes)
+          const getNextElement = (startIndex) => {
+              for (let j = startIndex + 1; j < nodes.length; j++) {
+                  if (nodes[j].nodeType === Node.ELEMENT_NODE) return { node: nodes[j], index: j };
+                  if (nodes[j].nodeType === Node.TEXT_NODE && nodes[j].textContent.trim() !== '') return null; // Found non-empty text, breaking sequence
+              }
+              return null;
+          };
+
           for (let i = 0; i < nodes.length; i++) {
             const node = nodes[i];
 
@@ -337,37 +348,184 @@
             if (node.nodeType === Node.ELEMENT_NODE) {
               const tag = node.tagName;
 
-              if (tag === 'H1') {
-                flushDetails();
-                newBlocks.push({
-                  id: Date.now().toString() + Math.random(),
-                  type: BlockTypes.TITLE,
-                  data: { tag: 'h1', text: node.textContent }
-                });
-              }
-              else if (tag === 'H2') {
-                flushDetails();
-                newBlocks.push({
-                  id: Date.now().toString() + Math.random(),
-                  type: BlockTypes.TITLE,
-                  data: { tag: 'h2', text: node.textContent }
-                });
-              }
-              else if (['H3', 'H4', 'H5', 'H6'].includes(tag)) {
-                if (tag === 'H3' && node.textContent.trim() === '# Changelog') {
-                     const next = nodes[i+1];
-                     if (next && next.tagName === 'PRE') {
-                         flushDetails();
-                         continue; 
+              if (['H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(tag)) {
+                const text = node.textContent.trim();
+                const nextObj = getNextElement(i);
+                const nextTag = nextObj ? nextObj.node.tagName : null;
+
+                // 1. CHANGELOG DETECTION
+                if (tag === 'H3' && text.toLowerCase().includes('changelog') && nextTag === 'PRE') {
+                     flushDetails();
+                     const preNode = nextObj.node;
+                     
+                     // Parse PRE text content for version history using Line-Based approach
+                     const logText = preNode.textContent;
+                     const logs = [];
+                     const lines = logText.split('\n');
+                     
+                     let currentVersion = null;
+
+                     lines.forEach(line => {
+                        const trimmedLine = line.trim();
+                        // Ignore separator lines
+                        if (trimmedLine.match(/^[-—]{3,}$/)) return; 
+                        
+                        if (trimmedLine.startsWith('## ')) {
+                            // Save previous version if exists
+                            if (currentVersion) {
+                                logs.push(currentVersion);
+                            }
+                            
+                            // Start new version
+                            const headerLine = trimmedLine.substring(3).trim(); // Remove '## '
+                            // Try to split version and date/title by em-dash, en-dash, or hyphen
+                            // Look for explicit " – " or " - " or " — "
+                            const separatorMatch = headerLine.match(/\s[–—]\s/) || headerLine.match(/\s-\s/);
+                            
+                            let version = '';
+                            let date = '';
+                            
+                            if (separatorMatch) {
+                                version = headerLine.substring(0, separatorMatch.index).trim();
+                                date = headerLine.substring(separatorMatch.index + separatorMatch[0].length).trim();
+                            } else {
+                                version = headerLine;
+                            }
+                            
+                            currentVersion = {
+                                version: version,
+                                date: date,
+                                changes: ''
+                            };
+                        } else if (currentVersion) {
+                            // Append to current changes
+                            if (currentVersion.changes) {
+                                currentVersion.changes += '\n' + line;
+                            } else {
+                                currentVersion.changes = line;
+                            }
+                        }
+                     });
+                     
+                     // Push last version
+                     if (currentVersion) {
+                         logs.push(currentVersion);
+                     }
+
+                     // Clean up trailing/leading whitespace in changes
+                     logs.forEach(log => {
+                         if (log.changes) log.changes = log.changes.trim();
+                     });
+
+                     if (logs.length > 0) {
+                        newBlocks.push({
+                            id: Date.now().toString() + Math.random(),
+                            type: BlockTypes.LOG,
+                            data: { logs }
+                        });
+                        i = nextObj.index; // Skip the PRE node
+                        continue;
                      }
                 }
 
+                // 2. CREDENTIALS DETECTION
+                if (text.toLowerCase().includes('credential')) {
+                     // Check pattern: H3 -> P (link) -> Table OR H3 -> Table
+                     let tableNode = null;
+                     let loginUrl = '';
+                     let consumeIndex = i;
+                     
+                     // Check if next is P or Table
+                     if (nextTag === 'P') {
+                         const anchor = nextObj.node.querySelector('a');
+                         if (anchor) loginUrl = anchor.href;
+                         
+                         // If P found, check what's after P
+                         const afterP = getNextElement(nextObj.index);
+                         if (afterP && afterP.node.tagName === 'TABLE') {
+                             tableNode = afterP.node;
+                             consumeIndex = afterP.index;
+                         }
+                     } else if (nextTag === 'TABLE') {
+                         tableNode = nextObj.node;
+                         consumeIndex = nextObj.index;
+                     }
+
+                     if (tableNode) {
+                         flushDetails();
+                         const creds = [];
+                         const rows = tableNode.querySelectorAll('tr');
+                         rows.forEach((row, rIdx) => {
+                             // Skip header row if it looks like header (th) or first row logic
+                             const cells = row.querySelectorAll('td');
+                             // Simple heuristic: if row has TH, ignore. If row index is 0 and cells look like headers, ignore?
+                             // Better: Only push if cells.length >= 3 and contents are not "Role / User" etc.
+                             if (cells.length >= 3) {
+                                 const c1 = cells[0].textContent.trim();
+                                 if (c1.toLowerCase().includes('role') || c1.toLowerCase().includes('user')) return; // Header row
+
+                                 creds.push({
+                                     role: cells[0].textContent.trim(),
+                                     email: cells[1].textContent.trim(),
+                                     password: cells[2].textContent.trim()
+                                 });
+                             }
+                         });
+                         
+                         newBlocks.push({
+                             id: Date.now().toString() + Math.random(),
+                             type: BlockTypes.CREDENTIALS,
+                             data: { 
+                                 title: text, 
+                                 description: '', // Could parse Description from P text if needed
+                                 loginUrl, 
+                                 credentials: creds 
+                             }
+                         });
+                         i = consumeIndex; // Skip consumed nodes
+                         continue;
+                     }
+                }
+
+                // 3. LIST WITH TITLE DETECTION
+                if (nextTag === 'UL' || nextTag === 'OL') {
+                    flushDetails();
+                    const listItems = [];
+                    nextObj.node.querySelectorAll('li').forEach(li => listItems.push(li.innerHTML));
+                    newBlocks.push({
+                        id: Date.now().toString() + Math.random(),
+                        type: BlockTypes.LIST,
+                        data: {
+                            title: text,
+                            listType: nextTag.toLowerCase(),
+                            items: listItems
+                        }
+                    });
+                    i = nextObj.index; // Skip the UL/OL node
+                    continue;
+                }
+
+                // 4. STANDARD HEADINGS
                 flushDetails();
-                newBlocks.push({
-                  id: Date.now().toString() + Math.random(),
-                  type: BlockTypes.SUBHEADING,
-                  data: { tag: tag.toLowerCase(), text: node.textContent }
-                });
+                if (tag === 'H1') {
+                    newBlocks.push({
+                      id: Date.now().toString() + Math.random(),
+                      type: BlockTypes.TITLE,
+                      data: { tag: 'h1', text: node.textContent }
+                    });
+                } else if (tag === 'H2') {
+                    newBlocks.push({
+                      id: Date.now().toString() + Math.random(),
+                      type: BlockTypes.TITLE,
+                      data: { tag: 'h2', text: node.textContent }
+                    });
+                } else {
+                    newBlocks.push({
+                      id: Date.now().toString() + Math.random(),
+                      type: BlockTypes.SUBHEADING,
+                      data: { tag: tag.toLowerCase(), text: node.textContent }
+                    });
+                }
               }
               else if (tag === 'IMG') {
                 flushDetails();
@@ -395,7 +553,7 @@
                       data: {
                           listType: tag.toLowerCase(),
                           items: listItems,
-                          title: '' // Title parsing is tricky without context, leaving empty
+                          title: '' 
                       }
                   });
               }
@@ -437,29 +595,15 @@
                 flushDetails();
                 const text = node.textContent;
                 const logs = [];
+                // Simple parsing for standalone pre blocks (not caught by H3 logic)
+                // Re-use logic or simplistic split
                 const versionBlocks = text.split(/(?=## )/g);
-                
                 versionBlocks.forEach(vBlock => {
                     const lines = vBlock.trim().split('\n');
-                    if (lines.length === 0 || !lines[0].startsWith('##')) return;
-                    
-                    const headerLine = lines[0].replace(/^##\s*/, '');
-                    const separatorIndex = headerLine.indexOf('–'); 
-                    
-                    let version = '';
-                    let date = '';
-                    
-                    if (separatorIndex !== -1) {
-                        version = headerLine.substring(0, separatorIndex).trim();
-                        date = headerLine.substring(separatorIndex + 1).trim();
-                    } else {
-                        version = headerLine;
-                    }
-
-                    const changes = lines.slice(1).join('\n').trim();
-                    
-                    if (version) {
-                        logs.push({ version, date, changes });
+                    if (lines.length > 0 && lines[0].startsWith('##')) {
+                        const headerLine = lines[0].replace(/^##\s*/, '');
+                        // Simplified
+                         logs.push({ version: headerLine, date: '', changes: lines.slice(1).join('\n').trim() });
                     }
                 });
 
