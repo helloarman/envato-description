@@ -221,7 +221,12 @@
                   break;
                 case BlockTypes.IMAGE:
                   if (block.data.url) {
-                    html += `<img src="${block.data.url}" alt="${block.data.alt || ''}" width="100%" />\n`;
+                    const imgTag = `<img src="${block.data.url}" alt="${block.data.alt || ''}" width="100%" />`;
+                    if (block.data.link) {
+                        html += `<a href="${block.data.link}">${imgTag}</a>\n`;
+                    } else {
+                        html += `${imgTag}\n`;
+                    }
                   }
                   break;
                 case BlockTypes.IMAGE_ROW:
@@ -232,7 +237,12 @@
                     block.data.images.forEach(img => {
                       html += `    <td width="${width}%" valign="top" align="center">\n`;
                       if (img.url) {
-                        html += `      <img src="${img.url}" alt="${img.alt || ''}" width="100%" />\n`;
+                        const imgTag = `<img src="${img.url}" alt="${img.alt || ''}" width="100%" />`;
+                        if (img.link) {
+                            html += `      <a href="${img.link}">${imgTag}</a>\n`;
+                        } else {
+                            html += `      ${imgTag}\n`;
+                        }
                       }
                       html += `    </td>\n`;
                     });
@@ -339,8 +349,11 @@
 
           for (let i = 0; i < nodes.length; i++) {
             const node = nodes[i];
+            
+            // Check if it's an Image Link (A tag wrapping an IMG)
+            const isImageLink = node.nodeType === Node.ELEMENT_NODE && node.tagName === 'A' && node.querySelector('img');
 
-            if (node.nodeType === Node.TEXT_NODE || (node.nodeType === Node.ELEMENT_NODE && !['H1','H2','H3','H4','H5','H6','IMG','TABLE','PRE','HR','UL','OL'].includes(node.tagName))) {
+            if (node.nodeType === Node.TEXT_NODE || (node.nodeType === Node.ELEMENT_NODE && !['H1','H2','H3','H4','H5','H6','IMG','TABLE','PRE','HR','UL','OL'].includes(node.tagName) && !isImageLink)) {
                currentDetails += node.nodeType === Node.TEXT_NODE ? node.textContent : node.outerHTML;
                continue;
             }
@@ -527,12 +540,19 @@
                     });
                 }
               }
-              else if (tag === 'IMG') {
+              else if (tag === 'IMG' || (tag === 'A' && node.querySelector('img'))) {
                 flushDetails();
+                let imgNode = tag === 'IMG' ? node : node.querySelector('img');
+                let link = tag === 'A' ? node.getAttribute('href') : '';
+                
                 newBlocks.push({
                   id: Date.now().toString() + Math.random(),
                   type: BlockTypes.IMAGE,
-                  data: { url: node.getAttribute('src'), alt: node.getAttribute('alt') }
+                  data: { 
+                      url: imgNode.getAttribute('src'), 
+                      alt: imgNode.getAttribute('alt'),
+                      link: link
+                  }
                 });
               }
               else if (tag === 'HR') {
@@ -563,10 +583,15 @@
                 const rows = node.querySelectorAll('tr');
                 
                 if (images.length > 0 && rows.length === 1) {
-                   const imgData = Array.from(images).map(img => ({
-                     url: img.getAttribute('src'),
-                     alt: img.getAttribute('alt') || ''
-                   }));
+                   const imgData = Array.from(images).map(img => {
+                     // Check if this image is wrapped in a link inside the table cell
+                     const parentLink = img.closest('a');
+                     return {
+                       url: img.getAttribute('src'),
+                       alt: img.getAttribute('alt') || '',
+                       link: parentLink ? parentLink.getAttribute('href') : ''
+                     };
+                   });
                    newBlocks.push({
                     id: Date.now().toString() + Math.random(),
                     type: BlockTypes.IMAGE_ROW,
@@ -975,11 +1000,21 @@
                 placeholder="Description of image for SEO"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Link (Optional)</label>
+              <input
+                type="text"
+                value={data.link || ''}
+                onChange={(e) => onChange({ ...data, link: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                placeholder="https://example.com"
+              />
+            </div>
           </div>
         );
 
         const ImageRowEditor = ({ data, onChange }) => {
-          const images = data.images || [{ url: '', alt: '' }, { url: '', alt: '' }];
+          const images = data.images || [{ url: '', alt: '', link: '' }, { url: '', alt: '', link: '' }];
 
           const updateImage = (index, field, value) => {
             const newImages = [...images];
@@ -988,7 +1023,7 @@
           };
 
           const addImage = () => {
-            onChange({ ...data, images: [...images, { url: '', alt: '' }] });
+            onChange({ ...data, images: [...images, { url: '', alt: '', link: '' }] });
           };
 
           const removeImage = (index) => {
@@ -1037,6 +1072,16 @@
                                 onChange={(e) => updateImage(index, 'alt', e.target.value)}
                                 className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
                                 placeholder="Image description"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">Link (Optional)</label>
+                            <input
+                                type="text"
+                                value={img.link || ''}
+                                onChange={(e) => updateImage(index, 'link', e.target.value)}
+                                className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                placeholder="https://..."
                             />
                         </div>
                     </div>
